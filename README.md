@@ -50,9 +50,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/shopware` - Data storage
-- `./rootfs/config/shopware` - Data storage
-- `./rootfs/data/db/mariadb/shopware` - Data storage
+- `./volumes/data/shopware` - Data storage
+- `./volumes/config/shopware` - Data storage
+- `./volumes/data/db/mariadb/shopware` - Data storage
 
 ## 🔐 Security
 
