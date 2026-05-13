@@ -1,5 +1,6 @@
 # nginx proxy address - http://172.17.0.1:8081
 
+name: shopware
 x-logging: &default-logging
   driver: json-file
   options:
@@ -7,22 +8,32 @@ x-logging: &default-logging
     max-file: "1"
 
 services:
-  shopware:
+  app:
     image: shopware/production:latest
+    pull_policy: always
     container_name: shopware-app
-    restart: unless-stopped
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
     logging: *default-logging
     networks:
       - shopware
     ports:
-      - "8081:80"
+      - "172.17.0.1:8081:80"
     environment:
       TZ: ${TZ:-America/New_York}
+      DATABASE_URL: mysql://${DB_USER_NAME:-shopware}:${DB_USER_PASS:-changeme_db_password}@shopware-db:3306/${DB_CREATE_DATABASE_NAME:-shopware}
+      APP_URL: https://${BASE_HOST_NAME:-$HOSTNAME}.${BASE_DOMAIN_NAME:-example.com}
+      APP_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
+      MAILER_DSN: smtp://${EMAIL_SERVER_HOST:-localhost}:${EMAIL_SERVER_PORT:-25}
     volumes:
-      - ./volumes/data/shopware:/data
-      - ./volumes/config/shopware:/config
+      - ./volumes/data/shopware/files:/var/www/html/files
+      - ./volumes/data/shopware/theme:/var/www/html/public/theme
+      - ./volumes/data/shopware/media:/var/www/html/public/media
+      - ./volumes/data/shopware/thumbnails:/var/www/html/public/thumbnail
+      - ./volumes/data/shopware/sitemap:/var/www/html/public/sitemap
     depends_on:
-      - shopware-db
+      shopware-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
@@ -30,9 +41,11 @@ services:
       retries: 3
 
   shopware-db:
-    image: mariadb:11
+    image: mariadb:latest
+    pull_policy: always
     container_name: shopware-db
-    restart: unless-stopped
+    hostname: shopware-db
+    restart: always
     logging: *default-logging
     networks:
       - shopware
@@ -41,7 +54,7 @@ services:
       MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-shopware}
       MARIADB_USER: ${DB_USER_NAME:-shopware}
       MARIADB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
-      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_root_password}
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
     volumes:
       - ./volumes/data/db/mariadb/shopware:/var/lib/mysql
     healthcheck:
@@ -52,4 +65,5 @@ services:
 
 networks:
   shopware:
+    name: shopware
     external: false
