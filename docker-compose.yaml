@@ -17,6 +17,8 @@ services:
     logging: *default-logging
     networks:
       - shopware
+      - proxy
+      - cloudflare
     ports:
       - "172.17.0.1:8081:80"
     environment:
@@ -25,6 +27,8 @@ services:
       APP_URL: https://${BASE_HOST_NAME:-$HOSTNAME}.${BASE_DOMAIN_NAME:-example.com}
       APP_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
       MAILER_DSN: smtp://${EMAIL_SERVER_HOST:-localhost}:${EMAIL_SERVER_PORT:-25}
+      CONTAINER_NAME: shopware-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     volumes:
       - ./volumes/data/shopware/files:/var/www/html/files
       - ./volumes/data/shopware/theme:/var/www/html/public/theme
@@ -39,6 +43,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://shopware-app:80'
+      - 'cloudflare.hostname=shopware.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.shopware-app.entrypoints=http'
+      - 'traefik.http.routers.shopware-app-secure.tls=true'
+      - 'traefik.http.routers.shopware-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.shopware-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.shopware-app.middlewares=shopware-app-https-redirect'
+      - 'traefik.http.routers.shopware-app-secure.entrypoints=https'
+      - 'traefik.http.routers.shopware-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.shopware-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.shopware-app-secure.service=shopware-app'
+      - 'traefik.http.services.shopware-app.loadbalancer.server.port=80'
 
   shopware-db:
     image: mariadb:latest
@@ -55,6 +75,7 @@ services:
       MARIADB_USER: ${DB_USER_NAME:-shopware}
       MARIADB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
       MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
+      CONTAINER_NAME: shopware-db
     volumes:
       - ./volumes/data/db/mariadb/shopware:/var/lib/mysql
     healthcheck:
@@ -67,3 +88,7 @@ networks:
   shopware:
     name: shopware
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
